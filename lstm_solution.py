@@ -295,15 +295,3 @@ def main(input_csv_path: str, output_csv_path: str) -> pd.DataFrame:
     )
     return output_df
 
-
-if __name__ == "__main__":
-    input_path = "TEP_Train_Test.csv"
-    output_path = "TEP_Train_Test_with_anomalies.csv"
-
-    try:
-        result = main(input_path, output_path)
-        print("Success! Anomaly detection completed.")
-        print(f"Output shape: {result.shape}")
-        print("New columns added: Abnormality_score, top_feature_1 through top_feature_7")
-    except Exception as error:
-        print(f"Error: {error}")
