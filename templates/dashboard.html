@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 LSTM Anomaly Detection Dashboard</title>
+    
+    <!-- External Libraries -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Modern 2025 Design System */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success-gradient: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            --danger-gradient: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            --warning-gradient: linear-gradient(135deg, #feca57 0%, #ff9ff3 100%);
+            --glass-bg: rgba(255, 255, 255, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.18);
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .glass-morphism {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        
+        .gradient-text {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hover-float {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        
+        .hover-float:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .hover-float:hover {
+                transform: none; /* Disable hover effects on mobile */
+            }
+        }
+        
+        .pulse-ring {
+            animation: pulse-ring 1.25s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+        
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(.33);
+            }
+            80%, 100% {
+                opacity: 0;
+            }
+        }
+        
+        .loading-dots {
+            display: inline-block;
+            position: relative;
+            width: 80px;
+            height: 80px;
+        }
+        
+        .loading-dots div {
+            position: absolute;
+            top: 33px;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background: #667eea;
+            animation-timing-function: cubic-bezier(0, 1, 1, 0);
+        }
+        
+        .loading-dots div:nth-child(1) {
+            left: 8px;
+            animation: loading-dots1 0.6s infinite;
+        }
+        
+        .loading-dots div:nth-child(2) {
+            left: 8px;
+            animation: loading-dots2 0.6s infinite;
+        }
+        
+        .loading-dots div:nth-child(3) {
+            left: 32px;
+            animation: loading-dots2 0.6s infinite;
+        }
+        
+        .loading-dots div:nth-child(4) {
+            left: 56px;
+            animation: loading-dots3 0.6s infinite;
+        }
+        
+        @keyframes loading-dots1 {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes loading-dots3 {
+            0% { transform: scale(1); }
+            100% { transform: scale(0); }
+        }
+        
+        @keyframes loading-dots2 {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(24px, 0); }
+        }
+        
+        .btn-primary {
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .metric-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.2);
+        }
+        
+        .drop-zone {
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        /* Mobile-responsive drop zone */
+        @media (max-width: 640px) {
+            .drop-zone {
+                padding: 1rem;
+            }
+        
+        
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--success-gradient);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+    }    
+    </style>
+</head>
+<body class="antialiased">
+    
+    <!-- Header -->
+    <header class="glass-morphism mx-3 sm:mx-6 mt-3 sm:mt-6 p-4 sm:p-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-600 flex items-center justify-center">
+                    <i class="fas fa-brain text-white text-lg sm:text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-white">LSTM Anomaly Detection</h1>
+                    <p class="text-xs sm:text-sm text-blue-100">Advanced AI-Powered Time Series Analysis</p>
+                </div>
+            </div>
+            <div class="flex space-x-2 sm:space-x-4">
+                <button class="text-white hover:text-blue-200 transition-colors" onclick="showHelp()">
+                    <i class="fas fa-question-circle text-lg sm:text-xl"></i>
+                </button>
+                <button class="text-white hover:text-blue-200 transition-colors" onclick="showSettings()">
+                    <i class="fas fa-cog text-lg sm:text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        
+        <!-- Upload Section -->
+        <div class="glass-morphism p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8 hover-float">
+            <h2 class="text-lg sm:text-xl lg:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center">
+                <i class="fas fa-upload mr-2 sm:mr-3 text-blue-300"></i>
+                Data Upload & Configuration
+            </h2>
+            
+            <!-- FIXED: Mobile-responsive grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+                <!-- File Upload - Full width on mobile, spans 2 columns on large screens -->
+                <div class="col-span-1 lg:col-span-2">
+                    <label class="block text-xs sm:text-sm font-medium text-blue-100 mb-2 sm:mb-3">
+                        <i class="fas fa-file-csv mr-2"></i>
+                        Select Time Series Data (CSV)
+                    </label>
+                    <div class="drop-zone" id="dropZone">
+                        <i class="fas fa-cloud-upload-alt text-2xl sm:text-3xl lg:text-4xl text-blue-200 mb-2 sm:mb-4 block"></i>
+                        <p class="text-sm sm:text-base lg:text-lg text-blue-100 mb-1 sm:mb-2">Drag & drop your CSV file here</p>
+                        <p class="text-xs sm:text-sm text-blue-200">or click to browse files</p>
+                        <input type="file" id="fileInput" accept=".csv" class="hidden">
+                        <div id="fileInfo" class="mt-2 sm:mt-4 hidden">
+                            <div class="inline-flex items-center px-3 sm:px-4 py-1 sm:py-2 bg-green-500 bg-opacity-20 rounded-lg text-green-200">
+                                <i class="fas fa-check mr-2"></i>
+                                <span id="fileName" class="text-xs sm:text-sm">File selected</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Parameters -->
+                <div class="col-span-1">
+                    <label class="block text-xs sm:text-sm font-medium text-blue-100 mb-2 sm:mb-3">
+                        <i class="fas fa-sliders-h mr-2"></i>
+                        Model Parameters
+                    </label>
+                    <div class="space-y-4 sm:space-y-6">
+                        <div>
+                            <label class="block text-xs text-blue-200 mb-2">Sequence Length</label>
+                            <input type="range" id="sequenceLength" min="12" max="48" value="24" 
+                                   class="w-full h-2 bg-blue-200 bg-opacity-30 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-xs text-blue-200 mt-1">
+                                <span>12</span>
+                                <span id="sequenceLengthValue" class="font-semibold">24</span>
+                                <span>48</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs text-blue-200 mb-2">Anomaly Threshold</label>
+                            <input type="range" id="threshold" min="0" max="100" value="50" 
+                                   class="w-full h-2 bg-blue-200 bg-opacity-30 rounded-lg appearance-none cursor-pointer">
+                            <div class="flex justify-between text-xs text-blue-200 mt-1">
+                                <span>0</span>
+                                <span id="thresholdValue" class="font-semibold">50</span>
+                                <span>100</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-xs text-blue-200 mb-2">Training Epochs</label>
+                            <select id="epochs" class="w-full px-3 py-2 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-yellow text-sm">
+                                <option value="20">20 (Fast)</option>
+                                <option value="30" selected>30 (Balanced)</option>
+                                <option value="50">50 (Accurate)</option>
+                            </select>
+                        </div>
+                        
+                        <button id="analyzeBtn" class="btn-primary w-full text-sm sm:text-base lg:text-lg py-2 sm:py-3" disabled>
+                            <i class="fas fa-play mr-2"></i>
+                            Run Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Preview -->
+        <div id="dataPreview" class="glass-morphism p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8 hover-float hidden">
+            <h2 class="text-lg sm:text-xl lg:text-2xl font-bold text-white mb-4 sm:mb-6 flex items-center">
+                <i class="fas fa-table mr-2 sm:mr-3 text-green-300"></i>
+                Data Overview
+            </h2>
+            <!-- FIXED: Responsive stats grid -->
+            <div id="dataStats" class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6"></div>
+            <div class="bg-white bg-opacity-10 rounded-xl p-3 sm:p-4 lg:p-6 overflow-x-auto">
+                <div id="dataTable"></div>
+            </div>
+        </div>
+
+        <!-- Loading Animation -->
+        <div id="loading" class="glass-morphism p-4 sm:p-6 lg:p-8 text-center hidden">
+            <div class="loading-dots mx-auto mb-4 sm:mb-6">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+            <h3 class="text-lg sm:text-xl font-semibold text-white mb-2 sm:mb-4">Training LSTM Model</h3>
+            <p class="text-sm sm:text-base text-blue-100 mb-4 sm:mb-6">Analyzing patterns and detecting anomalies...</p>
+            <div class="progress-bar max-w-md mx-auto">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <p id="progressText" class="text-xs sm:text-sm text-blue-200 mt-2">Initializing...</p>
+        </div>
+
+        <!-- Results Dashboard -->
+        <div id="results" class="hidden">
+            <!-- Statistics Cards - FIXED: Mobile responsive -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+                <div class="metric-card hover-float">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-blue-200 text-xs sm:text-sm font-medium">High Anomalies</p>
+                            <p id="highAnomalies" class="text-2xl sm:text-3xl font-bold text-red-400">-</p>
+                            <p id="anomalyPercentage" class="text-red-300 text-xs">-% of total</p>
+                        </div>
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-red-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-exclamation-triangle text-red-400 text-lg sm:text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metric-card hover-float">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-blue-200 text-xs sm:text-sm font-medium">Normal Points</p>
+                            <p id="normalPoints" class="text-2xl sm:text-3xl font-bold text-green-400">-</p>
+                            <p id="normalPercentage" class="text-green-300 text-xs">-% of total</p>
+                        </div>
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-check-circle text-green-400 text-lg sm:text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metric-card hover-float">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-blue-200 text-xs sm:text-sm font-medium">Max Score</p>
+                            <p id="maxScore" class="text-2xl sm:text-3xl font-bold text-yellow-400">-</p>
+                            <p id="maxScoreTime" class="text-yellow-300 text-xs">Peak anomaly</p>
+                        </div>
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-chart-line text-yellow-400 text-lg sm:text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="metric-card hover-float">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-blue-200 text-xs sm:text-sm font-medium">Mean Score</p>
+                            <p id="meanScore" class="text-2xl sm:text-3xl font-bold text-purple-400">-</p>
+                            <p id="stdScore" class="text-purple-300 text-xs">±- std dev</p>
+                        </div>
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500 bg-opacity-20 rounded-full flex items-center justify-center">
+                            <i class="fas fa-calculator text-purple-400 text-lg sm:text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts Section - FIXED: Mobile responsive -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 mb-6 sm:mb-8">
+                <!-- Timeline Chart -->
+                <div class="glass-morphism p-4 sm:p-6 lg:p-8 hover-float">
+                    <h3 class="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center">
+                        <i class="fas fa-chart-area mr-2 text-blue-300"></i>
+                        Anomaly Timeline
+                    </h3>
+                    <div id="timelinePlot" class="h-64 sm:h-80 lg:h-96"></div>
+                </div>
+                
+                <!-- Distribution Chart -->
+                <div class="glass-morphism p-4 sm:p-6 lg:p-8 hover-float">
+                    <h3 class="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center">
+                        <i class="fas fa-chart-bar mr-2 text-green-300"></i>
+                        Score Distribution
+                    </h3>
+                    <div id="distributionPlot" class="h-64 sm:h-80 lg:h-96"></div>
+                </div>
+            </div>
+            
+            <!-- Feature Analysis -->
+            <div class="glass-morphism p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8 hover-float">
+                <h3 class="text-lg sm:text-xl font-bold text-white mb-4 sm:mb-6 flex items-center">
+                    <i class="fas fa-list-ol mr-2 text-purple-300"></i>
+                    Top Contributing Features
+                </h3>
+                <div id="featureAnalysis"></div>
+            </div>
+            
+            <!-- Action Buttons - FIXED: Mobile responsive -->
+            <div class="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center">
+                <button id="downloadBtn" class="btn-primary flex items-center justify-center space-x-2 py-3 sm:py-2">
+                    <i class="fas fa-download"></i>
+                    <span>Download Results</span>
+                </button>
+                
+                <button onclick="generateReport()" class="bg-green-500 hover:bg-green-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center">
+                    <i class="fas fa-file-alt mr-2"></i>
+                    Generate Report
+                </button>
+                
+                <button onclick="resetAnalysis()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center">
+                    <i class="fas fa-redo mr-2"></i>
+                    New Analysis
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript - Same as before, no changes needed -->
+    <script>
+        // Global variables
+        let currentData = null;
+        let analysisResults = null;
+        
+        // DOM elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const dataPreview = document.getElementById('dataPreview');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        
+        // Parameter controls
+        const sequenceLength = document.getElementById('sequenceLength');
+        const threshold = document.getElementById('threshold');
+        const epochs = document.getElementById('epochs');
+        
+        // Initialize event listeners
+        function initializeEventListeners() {
+            // File upload
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', handleDragOver);
+            dropZone.addEventListener('dragleave', handleDragLeave);
+            dropZone.addEventListener('drop', handleDrop);
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Parameters
+            sequenceLength.addEventListener('input', updateSequenceLength);
+            threshold.addEventListener('input', updateThreshold);
+            
+            // Analysis
+            analyzeBtn.addEventListener('click', runAnalysis);
+        }
+        
+        // File handling functions
+        function handleDragOver(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+            console.log('Drag over event');
+        }
+        
+        function handleDragLeave() {
+            dropZone.classList.remove('dragover');
+            console.log('Drag leave event');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            console.log('Drop event:', e.dataTransfer.files);
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0]; // Get the first file
+                if (file.name.toLowerCase().endsWith('.csv')) {
+                    processFile(file); // Pass single file, not FileList
+                } else {
+                    showAlert('Please drop a valid CSV file', 'error');
+                }
+            }
+        }
+        
+        function handleFileSelect(e) {
+            console.log('File select event:', e.target.files);
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0]; // Get the first file
+                processFile(file); // Pass single file, not FileList
+            }
+        }
+        
+        // FIXED: File processing function - now accepts single File object
+        async function processFile(file) {
+            console.log('Processing file:', {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            });
+            
+            // Validate file
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showAlert('Please select a CSV file', 'error');
+                return;
+            }
+            
+            if (file.size > 50 * 1024 * 1024) { // 50MB limit
+                showAlert('File too large. Maximum size is 50MB', 'error');
+                return;
+            }
+            
+            if (file.size === 0) {
+                showAlert('File is empty', 'error');
+                return;
+            }
+            
+            // Show file info immediately
+            fileName.textContent = file.name;
+            fileInfo.classList.remove('hidden');
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // Debug FormData
+            console.log('FormData created:');
+            for (let pair of formData.entries()) {
+                console.log(pair[0], pair[1]);
+            }
+            
+            try {
+                showAlert('Uploading file...', 'info');
+                
+                console.log('Sending POST request to /upload');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                    // Don't set Content-Type header - let browser handle multipart boundary
+                });
+                
+                console.log('Response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Upload failed with status:', response.status, errorText);
+                    throw new Error(`Upload failed: HTTP ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Upload successful:', data);
+                
+                if (data.success) {
+                    currentData = data;
+                    analyzeBtn.disabled = false;
+                    showDataPreview(data);
+                    showAlert(`File uploaded: ${data.filename}`, 'success');
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                showAlert(`Upload error: ${error.message}`, 'error');
+                // Reset file info on error
+                fileInfo.classList.add('hidden');
+                analyzeBtn.disabled = true;
+            }
+        }
+
+        // Parameter update functions
+        function updateSequenceLength() {
+            document.getElementById('sequenceLengthValue').textContent = sequenceLength.value;
+        }
+        
+        function updateThreshold() {
+            document.getElementById('thresholdValue').textContent = threshold.value;
+        }
+        
+        // Data preview
+        function showDataPreview(data) {
+            const statsHTML = `
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-200 text-xs sm:text-sm">Rows</p>
+                            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-white">${data.shape[0].toLocaleString()}</p>
+                        </div>
+                        <i class="fas fa-database text-blue-400 text-lg sm:text-xl lg:text-2xl"></i>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-200 text-xs sm:text-sm">Features</p>
+                            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-white">${data.total_features}</p>
+                        </div>
+                        <i class="fas fa-columns text-green-400 text-lg sm:text-xl lg:text-2xl"></i>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-200 text-xs sm:text-sm">Duration</p>
+                            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-white">${data.shape[0]}h</p>
+                        </div>
+                        <i class="fas fa-clock text-purple-400 text-lg sm:text-xl lg:text-2xl"></i>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-200 text-xs sm:text-sm">Memory</p>
+                            <p class="text-lg sm:text-xl lg:text-2xl font-bold text-white">${data.data_info.memory_usage}</p>
+                        </div>
+                        <i class="fas fa-memory text-yellow-400 text-lg sm:text-xl lg:text-2xl"></i>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('dataStats').innerHTML = statsHTML;
+            
+            // Create data table
+            let tableHTML = '<div class="overflow-x-auto"><table class="min-w-full text-white"><thead><tr class="border-b border-white border-opacity-20">';
+            data.columns.slice(0, 8).forEach(col => {
+                tableHTML += `<th class="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold">${col}</th>`;
+            });
+            if (data.columns.length > 8) {
+                tableHTML += '<th class="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs sm:text-sm font-semibold">...</th>';
+            }
+            tableHTML += '</tr></thead><tbody>';
+            
+            data.preview.slice(0, 5).forEach((row, idx) => {
+                tableHTML += `<tr class="border-b border-white border-opacity-10 ${idx % 2 === 0 ? 'bg-white bg-opacity-5' : ''}">`;
+                data.columns.slice(0, 8).forEach(col => {
+                    const value = row[col];
+                    const displayValue = typeof value === 'number' ? value.toFixed(2) : value;
+                    tableHTML += `<td class="px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm">${displayValue}</td>`;
+                });
+                if (data.columns.length > 8) {
+                    tableHTML += '<td class="px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm text-gray-400">...</td>';
+                }
+                tableHTML += '</tr>';
+            });
+            
+            tableHTML += '</tbody></table></div>';
+            document.getElementById('dataTable').innerHTML = tableHTML;
+            dataPreview.classList.remove('hidden');
+        }
+        
+        // Analysis execution
+        async function runAnalysis() {
+            if (!currentData) {
+                showAlert('Please upload a file first', 'error');
+                return;
+            }
+            
+            console.log('Starting analysis...');
+            
+            // Hide previous results and show loading
+            results.classList.add('hidden');
+            loading.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Analyzing...';
+            
+            // Simulate progress
+            simulateProgress();
+            
+            const params = {
+                sequence_length: parseInt(sequenceLength.value),
+                threshold: parseInt(threshold.value),
+                epochs: parseInt(epochs.value)
+            };
+            
+            console.log('Analysis parameters:', params);
+            
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(params)
+                });
+                
+                console.log('Analysis response:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Analysis failed: HTTP ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Analysis successful:', data);
+                
+                if (data.success) {
+                    analysisResults = data;
+                    setTimeout(() => {
+                        showResults(data);
+                        loading.classList.add('hidden');
+                    }, 1000);
+                } else {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+            } catch (error) {
+                console.error('Analysis error:', error);
+                loading.classList.add('hidden');
+                showAlert('Analysis failed: ' + error.message, 'error');
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Run Analysis';
+            }
+        }
+        
+        // Progress simulation
+        function simulateProgress() {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const stages = [
+                { progress: 10, text: 'Loading data...' },
+                { progress: 25, text: 'Preprocessing features...' },
+                { progress: 45, text: 'Training LSTM model...' },
+                { progress: 70, text: 'Detecting anomalies...' },
+                { progress: 90, text: 'Calculating feature importance...' },
+                { progress: 100, text: 'Finalizing results...' }
+            ];
+            
+            let currentStage = 0;
+            const interval = setInterval(() => {
+                if (currentStage < stages.length) {
+                    const stage = stages[currentStage];
+                    progressFill.style.width = stage.progress + '%';
+                    progressText.textContent = stage.text;
+                    currentStage++;
+                } else {
+                    clearInterval(interval);
+                }
+            }, 800);
+        }
+        
+        // Results display
+        function showResults(data) {
+            // Update statistics cards
+            const stats = data.statistics;
+            const anomaly = data.anomaly_summary;
+            
+            document.getElementById('highAnomalies').textContent = anomaly.high_anomalies.toLocaleString();
+            document.getElementById('anomalyPercentage').textContent = `${anomaly.anomaly_percentage.toFixed(1)}% of total`;
+            
+            document.getElementById('normalPoints').textContent = anomaly.normal_points.toLocaleString();
+            document.getElementById('normalPercentage').textContent = `${(100 - anomaly.anomaly_percentage).toFixed(1)}% of total`;
+            
+            document.getElementById('maxScore').textContent = stats.max.toFixed(1);
+            document.getElementById('meanScore').textContent = stats.mean.toFixed(1);
+            document.getElementById('stdScore').textContent = `±${stats.std.toFixed(1)} std dev`;
+            
+            // Create timeline chart
+            createTimelineChart(data.time_series_data, data.threshold_used);
+            
+            // Create distribution chart
+            createDistributionChart(data.distribution_data, data.threshold_used);
+            
+            // Create feature analysis
+            createFeatureAnalysis(data.top_contributors);
+            
+            // Show results
+            results.classList.remove('hidden');
+            
+            // Smooth scroll to results
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            showAlert('Analysis completed successfully!', 'success');
+        }
+        
+        // Chart creation functions
+        function createTimelineChart(timeSeriesData, threshold) {
+            const normalData = timeSeriesData.filter(d => !d.is_anomaly);
+            const anomalyData = timeSeriesData.filter(d => d.is_anomaly);
+            
+            const traces = [
+                {
+                    x: normalData.map(d => d.time),
+                    y: normalData.map(d => d.score),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Normal',
+                    line: { color: '#4ecdc4', width: 2 },
+                    hovertemplate: 'Time: %{x}<br>Score: %{y:.2f}<extra></extra>'
+                },
+                {
+                    x: anomalyData.map(d => d.time),
+                    y: anomalyData.map(d => d.score),
+                    type: 'scatter',
+                    mode: 'markers',
+                    name: 'Anomalies',
+                    marker: { color: '#ff6b6b', size: 6, symbol: 'x' },
+                    hovertemplate: 'Time: %{x}<br>Score: %{y:.2f}<br>Status: Anomaly<extra></extra>'
+                }
+            ];
+            
+            const layout = {
+                title: {
+                    text: 'Anomaly Detection Timeline',
+                    font: { color: 'white', size: 16 }
+                },
+                xaxis: { 
+                    title: 'Time Points',
+                    color: 'white',
+                    gridcolor: 'rgba(255,255,255,0.2)'
+                },
+                yaxis: { 
+                    title: 'Anomaly Score',
+                    color: 'white',
+                    gridcolor: 'rgba(255,255,255,0.2)'
+                },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: 'white' },
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    y: -0.2,
+                    font: { color: 'white' }
+                },
+                shapes: [{
+                    type: 'line',
+                    x0: 0,
+                    x1: timeSeriesData.length,
+                    y0: threshold,
+                    y1: threshold,
+                    line: {
+                        color: '#ff6b6b',
+                        width: 2,
+                        dash: 'dash'
+                    }
+                }],
+                annotations: [{
+                    x: timeSeriesData.length * 0.8,
+                    y: threshold,
+                    text: `Threshold: ${threshold}`,
+                    showarrow: false,
+                    font: { color: '#ff6b6b', size: 12 },
+                    bgcolor: 'rgba(255, 107, 107, 0.2)',
+                    bordercolor: '#ff6b6b',
+                    borderwidth: 1
+                }]
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: false
+            };
+            
+            Plotly.newPlot('timelinePlot', traces, layout, config);
+        }
+        
+        function createDistributionChart(distributionData, threshold) {
+            const trace = {
+                x: distributionData.map(d => (d.bin_start + d.bin_end) / 2),
+                y: distributionData.map(d => d.count),
+                type: 'bar',
+                name: 'Frequency',
+                marker: {
+                    color: distributionData.map(d => 
+                        (d.bin_start + d.bin_end) / 2 > threshold ? '#ff6b6b' : '#4ecdc4'
+                    ),
+                    line: { color: 'rgba(255,255,255,0.3)', width: 1 }
+                },
+                hovertemplate: 'Score: %{x:.1f}<br>Count: %{y}<extra></extra>'
+            };
+            
+            const layout = {
+                title: {
+                    text: 'Anomaly Score Distribution',
+                    font: { color: 'white', size: 16 }
+                },
+                xaxis: { 
+                    title: 'Anomaly Score',
+                    color: 'white',
+                    gridcolor: 'rgba(255,255,255,0.2)'
+                },
+                yaxis: { 
+                    title: 'Frequency',
+                    color: 'white',
+                    gridcolor: 'rgba(255,255,255,0.2)'
+                },
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: 'white' },
+                showlegend: false,
+                shapes: [{
+                    type: 'line',
+                    x0: threshold,
+                    x1: threshold,
+                    y0: 0,
+                    y1: Math.max(...distributionData.map(d => d.count)),
+                    line: {
+                        color: '#ff6b6b',
+                        width: 2,
+                        dash: 'dash'
+                    }
+                }]
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: false
+            };
+            
+            Plotly.newPlot('distributionPlot', [trace], layout, config);
+        }
+        
+        function createFeatureAnalysis(topContributors) {
+            if (!topContributors || topContributors.length === 0) {
+                document.getElementById('featureAnalysis').innerHTML = 
+                    '<p class="text-blue-200">No significant feature contributors found.</p>';
+                return;
+            }
+            
+            const maxCount = topContributors[0][1];
+            let html = '<div class="space-y-4">';
+            
+            topContributors.slice(0, 10).forEach((feature, index) => {
+                const [name, count] = feature;
+                const percentage = (count / maxCount * 100);
+                const widthPercent = Math.max(percentage, 10); // Minimum 10% for visibility
+                
+                html += `
+                    <div class="flex items-center justify-between p-3 sm:p-4 bg-white bg-opacity-10 rounded-lg hover:bg-opacity-20 transition-colors">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-medium text-white text-sm sm:text-base">${index + 1}. ${name}</span>
+                                <span class="text-blue-200 text-xs sm:text-sm">${count} occurrences</span>
+                            </div>
+                            <div class="w-full bg-gray-600 bg-opacity-50 rounded-full h-2">
+                                <div class="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-300" 
+                                     style="width: ${widthPercent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            document.getElementById('featureAnalysis').innerHTML = html;
+        }
+        
+        // Utility functions - Enhanced alert system
+        function showAlert(message, type = 'info') {
+            console.log(`Alert [${type}]: ${message}`);
+            
+            // Remove existing alerts
+            document.querySelectorAll('.alert-message').forEach(el => el.remove());
+            
+            const alertColors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+            
+            const alertIcons = {
+                success: 'check',
+                error: 'times',
+                warning: 'exclamation-triangle',
+                info: 'info-circle'
+            };
+            
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert-message fixed top-3 sm:top-6 right-3 sm:right-6 ${alertColors[type]} text-white px-4 sm:px-6 py-3 sm:py-4 rounded-lg shadow-lg z-50 transform transition-all duration-300 max-w-sm`;
+            alertDiv.style.transform = 'translateX(100%)';
+            alertDiv.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas fa-${alertIcons[type]} mr-2"></i>
+                    <span class="text-sm sm:text-base">${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(alertDiv);
+            
+            // Animate in
+            setTimeout(() => {
+                alertDiv.style.transform = 'translateX(0)';
+            }, 100);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (alertDiv.parentNode) {
+                            alertDiv.remove();
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        }
+        
+        function showHelp() {
+            const helpText = `
+                <h3 class="text-lg font-bold mb-4">How to Use LSTM Anomaly Detection</h3>
+                <div class="space-y-3 text-sm">
+                    <div><strong>1. Upload Data:</strong> Drag & drop or select a CSV file with time series data</div>
+                    <div><strong>2. Configure Parameters:</strong> Adjust sequence length, threshold, and epochs</div>
+                    <div><strong>3. Run Analysis:</strong> Click the "Run Analysis" button to start processing</div>
+                    <div><strong>4. View Results:</strong> Explore interactive charts and download results</div>
+                </div>
+                <div class="mt-4 p-3 bg-blue-500 bg-opacity-20 rounded">
+                    <strong>Data Requirements:</strong> CSV format, multiple numeric columns, minimum 120 rows
+                </div>
+            `;
+            
+            showModal('Help', helpText);
+        }
+        
+        function showSettings() {
+            const settingsHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Theme</label>
+                        <select class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded">
+                            <option>Dark (Current)</option>
+                            <option>Light</option>
+                            <option>Auto</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Auto-refresh Results</label>
+                        <input type="checkbox" class="mr-2"> Enable auto-refresh
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Export Format</label>
+                        <select class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded">
+                            <option>CSV</option>
+                            <option>JSON</option>
+                            <option>Excel</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            
+            showModal('Settings', settingsHTML);
+        }
+        
+        function showModal(title, content) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="glass-morphism p-6 sm:p-8 max-w-md w-full">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg sm:text-xl font-bold text-white">${title}</h2>
+                        <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-gray-300">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="text-white text-sm sm:text-base">
+                        ${content}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+        
+        function generateReport() {
+    if (!analysisResults) {
+        showAlert('No analysis results. Please run analysis first.', 'warning');
+        return;
+    }
+    
+    showAlert('Downloading comprehensive report...', 'info');
+    // Simple redirect - bypasses CORS entirely
+    window.open('/generate-report', '_blank');
+}
+
+
+
+        
+        function resetAnalysis() {
+            // Reset all states
+            currentData = null;
+            analysisResults = null;
+            
+            // Hide sections
+            dataPreview.classList.add('hidden');
+            results.classList.add('hidden');
+            loading.classList.add('hidden');
+            
+            // Reset form
+            fileInput.value = '';
+            fileInfo.classList.add('hidden');
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Run Analysis';
+            
+            // Reset parameters to defaults
+            sequenceLength.value = 24;
+            threshold.value = 50;
+            epochs.value = 30;
+            updateSequenceLength();
+            updateThreshold();
+            
+            showAlert('Ready for new analysis', 'info');
+        }
+        
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            try {
+                showAlert('Preparing download...', 'info');
+                window.location.href = '/download';
+            } catch (error) {
+                console.error('Download error:', error);
+                showAlert('Download failed: ' + error.message, 'error');
+            }
+        });
+        
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, initializing application...');
+            initializeEventListeners();
+            updateSequenceLength();
+            updateThreshold();
+            
+            // Show welcome message
+            setTimeout(() => {
+                showAlert('Welcome to LSTM Anomaly Detection Dashboard!', 'success');
+            }, 500);
+        });
+    </script>
+</body>
+</html>
