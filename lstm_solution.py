@@ -11,7 +11,6 @@ try:
     from tensorflow.keras.models import Model
     from tensorflow.keras.layers import Input, LSTM, RepeatVector
     from tensorflow.keras.optimizers import Adam
-    from tensorflow.keras.callbacks import EarlyStopping
     TENSORFLOW_AVAILABLE = True
 except ImportError:
     TENSORFLOW_AVAILABLE = False
@@ -19,13 +18,14 @@ except ImportError:
 
 
 class LSTMAnomalyDetector:
+    
 
     def __init__(
         self,
         sequence_length: int = 24,
-        encoding_dim: int = 32,
-        lstm_units: int = 64,
-        learning_rate: float = 0.001,
+        encoding_dim: int = 64,
+        lstm_units: int = 128,
+        learning_rate: float = 0.001
     ):
         self.sequence_length = sequence_length
         self.encoding_dim = encoding_dim
@@ -36,6 +36,7 @@ class LSTMAnomalyDetector:
         self.feature_names = []
 
     def _build_model(self, n_features: int) -> Model:
+        
         inputs = Input(shape=(self.sequence_length, n_features))
         encoded = LSTM(
             self.lstm_units, activation='relu', return_sequences=True
@@ -45,7 +46,7 @@ class LSTMAnomalyDetector:
         )(encoded)
         decoded = RepeatVector(self.sequence_length)(encoded)
         decoded = LSTM(
-            self.encoding_dim, activation='relu', return_sequences=True
+            self.lstm_units, activation='relu', return_sequences=True
         )(decoded)
         decoded = LSTM(
             n_features, activation='linear', return_sequences=True
@@ -59,46 +60,39 @@ class LSTMAnomalyDetector:
         return autoencoder
 
     def _create_sequences(self, data: np.ndarray) -> np.ndarray:
-        if len(data) < self.sequence_length:
-            return np.empty((0, self.sequence_length, data.shape[1]))
-
-        shape = (data.shape[0] - self.sequence_length + 1, self.sequence_length, data.shape[1])
-        strides = (data.strides[0], data.strides[0], data.strides[1])
-        sequences = np.lib.stride_tricks.as_strided(data, shape=shape, strides=strides)
+        
+        sequences = []
+        for i in range(len(data) - self.sequence_length + 1):
+            sequences.append(data[i:i + self.sequence_length])
         return np.array(sequences)
 
     def fit(
         self,
         X_train: np.ndarray,
-        epochs: int = 30,
-        batch_size: int = 8,
+        epochs: int = 50,
+        batch_size: int = 32,
         validation_split: float = 0.1
     ) -> None:
+        
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_train_seq = self._create_sequences(X_train_scaled)
-        if len(X_train_seq) == 0:
-            raise ValueError("Training data too short for the sequence length.")
         self.model = self._build_model(X_train.shape[1])
-        early_stop = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True, verbose=1)
         self.model.fit(
             X_train_seq, X_train_seq,
             epochs=epochs,
             batch_size=batch_size,
             validation_split=validation_split,
-            callbacks=[early_stop],
-            verbose=1
+            verbose=0
         )
 
     def predict_anomaly_scores(
-        self,
-        X: np.ndarray
+        self, X: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate anomaly scores for input data.
+        """
         X_scaled = self.scaler.transform(X)
         X_seq = self._create_sequences(X_scaled)
-        if len(X_seq) == 0:
-            # Not enough data for a sequence, return zeros
-            return np.zeros(len(X)), np.zeros(X.shape[1])
-
         X_pred = self.model.predict(X_seq, verbose=0)
         reconstruction_errors = np.mean(
             np.square(X_seq - X_pred), axis=(1, 2)
@@ -107,9 +101,8 @@ class LSTMAnomalyDetector:
             np.square(X_seq - X_pred), axis=(0, 1)
         )
         anomaly_scores = np.zeros(len(X))
-        anomaly_scores[self.sequence_length - 1:] = reconstruction_errors
-
-        # For initial points, calculate a simpler deviation score
+        if len(reconstruction_errors) > 0:
+            anomaly_scores[self.sequence_length - 1:] = reconstruction_errors
         for i in range(min(self.sequence_length - 1, len(X))):
             if i == 0:
                 anomaly_scores[i] = 0.0
@@ -184,24 +177,18 @@ class DataProcessor:
     @staticmethod
     def load_and_preprocess(file_path: str) -> Tuple[pd.DataFrame, List[str]]:
         
-       
-
         df = pd.read_csv(file_path)
-
         feature_names = [
             col for col in df.columns
             if col.lower() not in ['time', 'timestamp', 'date']
         ]
-
-        # Forward-fill then backward fill missing values, with zero fallback for safety
         for col in feature_names:
-            df[col] = df[col].fillna(method='ffill').fillna(method='bfill').fillna(0)
-
-        # Replace inf values with nan then replace nan with median
-        df[feature_names] = df[feature_names].replace([np.inf, -np.inf], np.nan)
+            df[col] = df[col].fillna(method='ffill') \
+                             .fillna(method='bfill').fillna(0)
+        df[feature_names] = \
+            df[feature_names].replace([np.inf, -np.inf], np.nan)
         for col in feature_names:
             df[col] = df[col].fillna(df[col].median())
-
         return df, feature_names
 
     @staticmethod
@@ -219,7 +206,7 @@ class DataProcessor:
 
 def main(input_csv_path: str, output_csv_path: str) -> pd.DataFrame:
     """
-    Main function to process anomaly detection efficiently.
+    Main function to process anomaly detection.
     """
     if not TENSORFLOW_AVAILABLE:
         raise ImportError(
@@ -229,25 +216,20 @@ def main(input_csv_path: str, output_csv_path: str) -> pd.DataFrame:
     print("Loading and preprocessing data...")
     processor = DataProcessor()
     df, feature_names = processor.load_and_preprocess(input_csv_path)
-
     normal_data, full_data = processor.split_normal_period(
         df, feature_names, normal_hours=120
     )
-
     print(f"Data shape: {full_data.shape}")
     print(f"Normal period shape: {normal_data.shape}")
     print(f"Features: {len(feature_names)}")
-
-    print("Training LSTM Autoencoder (memory optimized)...")
+    print("Training LSTM Autoencoder...")
     detector = LSTMAnomalyDetector(
         sequence_length=min(24, len(normal_data) // 2),
         encoding_dim=32,
         lstm_units=64
     )
     detector.feature_names = feature_names
-
-    detector.fit(normal_data, epochs=30, batch_size=8, validation_split=0.1)
-
+    detector.fit(normal_data, epochs=30, batch_size=16, validation_split=0.1)
     print("Detecting anomalies...")
     anomaly_scores, _ = detector.predict_anomaly_scores(full_data)
     anomaly_scores = np.array(anomaly_scores).flatten()
@@ -261,12 +243,10 @@ def main(input_csv_path: str, output_csv_path: str) -> pd.DataFrame:
         anomaly_scores = np.ones_like(anomaly_scores) * 10
 
     anomaly_scores += np.random.uniform(0.01, 0.1, size=len(anomaly_scores))
-
     print("Identifying top contributing features...")
     top_features = detector.get_top_features(full_data, feature_names, n_top=7)
 
     output_df = df.copy()
-
     if len(anomaly_scores) != len(output_df):
         if len(anomaly_scores) < len(output_df):
             padded_scores = np.zeros(len(output_df))
@@ -288,7 +268,6 @@ def main(input_csv_path: str, output_csv_path: str) -> pd.DataFrame:
 
     output_df.to_csv(output_csv_path, index=False)
     print(f"Analysis complete. Output saved to: {output_csv_path}")
-
     training_end = min(120, len(anomaly_scores))
     training_scores = anomaly_scores[:training_end]
     print(
@@ -296,5 +275,4 @@ def main(input_csv_path: str, output_csv_path: str) -> pd.DataFrame:
         f"Mean: {np.mean(training_scores):.2f}, "
         f"Max: {np.max(training_scores):.2f}"
     )
-
     return output_df
