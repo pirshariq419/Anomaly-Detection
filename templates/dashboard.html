@@ -424,6 +424,11 @@
                     <span>Download Results</span>
                 </button>
                 
+                <button onclick="generateReport()" class="bg-green-500 hover:bg-green-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center">
+                    <i class="fas fa-file-alt mr-2"></i>
+                    Generate Report
+                </button>
+                
                 <button onclick="resetAnalysis()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center">
                     <i class="fas fa-redo mr-2"></i>
                     New Analysis
@@ -1085,6 +1090,19 @@
             document.body.appendChild(modal);
         }
         
+        function generateReport() {
+    if (!analysisResults) {
+        showAlert('No analysis results. Please run analysis first.', 'warning');
+        return;
+    }
+    
+    showAlert('Downloading comprehensive report...', 'info');
+    // Simple redirect - bypasses CORS entirely
+    window.open('/generate-report', '_blank');
+}
+
+
+
         
         function resetAnalysis() {
             // Reset all states
